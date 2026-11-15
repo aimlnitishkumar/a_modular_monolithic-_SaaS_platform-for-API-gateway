@@ -108,9 +108,22 @@ CORS_ALLOWED_ORIGINS = env(
     default="http://localhost:3000,http://127.0.0.1:3000",
 ).split(",")
 
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")
+API_KEY_PREFIX = env("API_KEY_PREFIX", default="mf_")
+
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=REDIS_URL)
 CELERY_TASK_ALWAYS_EAGER = env("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_BEAT_SCHEDULE = {
+    "aggregate-usage-every-5-minutes": {
+        "task": "apps.usage.tasks.aggregate_usage_task",
+        "schedule": 300.0,
+    },
+    "generate-monthly-invoices-daily": {
+        "task": "apps.billing.tasks.generate_monthly_invoices_task",
+        "schedule": 86400.0,
+    },
+}
 
 LOGGING = {
     "version": 1,

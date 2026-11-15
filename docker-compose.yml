@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: meterflow-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-meterflow}
       POSTGRES_USER: ${POSTGRES_USER:-meterflow}
@@ -19,6 +20,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: meterflow-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     healthcheck:
@@ -32,6 +34,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: meterflow-web
+    restart: unless-stopped
     command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
     environment:
       DJANGO_ENV: ${DJANGO_ENV:-development}
@@ -54,12 +57,18 @@ services:
         condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')\" || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   celery-worker:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: meterflow-celery-worker
+    restart: unless-stopped
     command: celery -A config worker -l info
     environment:
       DJANGO_ENV: ${DJANGO_ENV:-development}
@@ -76,12 +85,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
 
   celery-beat:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: meterflow-celery-beat
+    restart: unless-stopped
     command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
       DJANGO_ENV: ${DJANGO_ENV:-development}
@@ -104,6 +119,7 @@ services:
       context: .
       dockerfile: Dockerfile.nginx
     container_name: meterflow-nginx
+    restart: unless-stopped
     depends_on:
       - web
     ports:
@@ -112,6 +128,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: meterflow-prometheus
+    restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
@@ -120,6 +137,7 @@ services:
   grafana:
     image: grafana/grafana:11.1.4
     container_name: meterflow-grafana
+    restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
